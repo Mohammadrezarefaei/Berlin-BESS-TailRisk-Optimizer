@@ -1,3 +1,4 @@
+Markdown
 # ⚡ Berlin BESS Tail-Risk Optimizer & Solar Nowcasting
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/)
@@ -65,9 +66,12 @@ Berlin-BESS-TailRisk-Optimizer/
 ├── app.py                   # Main standalone execution script
 ├── requirements.txt         # Project dependencies
 └── README.md
-pip install -r requirements.txt
-python3 -m unittest discover tests
-python3 app.py
+⚙️ Getting Started & Installation
+Clone the repository:
+
+Bash
+git clone https://github.com/Mohammadrezarefaei/Berlin-BESS-TailRisk-Optimizer.git
+cd Berlin-BESS-TailRisk-Optimizer
 Install dependencies:
 
 Bash
