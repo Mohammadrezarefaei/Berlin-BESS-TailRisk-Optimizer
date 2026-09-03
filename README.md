@@ -54,6 +54,7 @@ Berlin-BESS-TailRisk-Optimizer/
 ├── app.py                   # Main standalone execution script
 ├── requirements.txt         # Project dependencies
 └── README.md
+---
 ⚙️ Getting Started & Installation
 1. Clone the repository:
 
