@@ -7,7 +7,7 @@ class TestBESSTailRiskOptimizer(unittest.TestCase):
     
     def setUp(self):
         """Set up test environment and mock data before each test."""
-        self.hours = pd.date_range(start="2026-08-28 00:00", periods=24, freq="H")
+        self.hours = pd.date_range(start="2026-08-28 00:00", periods=24, freq="h")
         self.base_cf = np.array([
             0.0, 0.0, 0.0, 0.0, 0.0, 0.2, 0.15, 0.30, 0.50, 0.70, 0.85, 0.90,
             0.85, 0.70, 0.50, 0.30, 0.15, 0.05, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
@@ -40,7 +40,7 @@ class TestBESSTailRiskOptimizer(unittest.TestCase):
         T = range(24)
         max_p = 10.0
         max_e = 20.0
-        initial_soc = 10.0
+        initial_soc = 20.0  # Fully charged to force discharge during storm tail-risk
         eta = 0.95
 
         p_charge = pulp.LpVariable.dicts("P_Charge", T, lowBound=0, upBound=max_p)
