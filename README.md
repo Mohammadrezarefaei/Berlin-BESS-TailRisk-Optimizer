@@ -3,7 +3,7 @@
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Optimization: PuLP](https://img.shields.io/badge/Optimization-Linear%20Programming-orange.svg)](https://coin-or.github.io/pulp/)
-[![Streamlit App]([https://img.shields.io/badge/Streamlit-Live%20Demo-red.svg](https://berlin-bess-tailrisk-optimizer-fupczjf5yppk8e7zjjfocf.streamlit.app/))](TBD_STREAMLIT_LINK_HERE)
+[![Streamlit App](https://img.shields.io/badge/Streamlit-Live%20Demo-red.svg)](https://berlin-bess-tailrisk-optimizer-fupczjf5yppk8e7zjjfocf.streamlit.app/)
 
 ## 🎯 Project Overview
 This repository contains a professional-grade Python pipeline designed to optimize **Battery Energy Storage Systems (BESS)** dispatch within the German **50Hertz control area** (Berlin/Brandenburg region). 
