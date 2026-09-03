@@ -65,3 +65,25 @@ Berlin-BESS-TailRisk-Optimizer/
 ├── app.py                   # Main standalone execution script
 ├── requirements.txt         # Project dependencies
 └── README.md
+⚙️ Getting Started & Installation
+Clone the repository:
+
+Bash
+git clone [https://github.com/Mohammadrezarefaei/Berlin-BESS-TailRisk-Optimizer.git](https://github.com/Mohammadrezarefaei/Berlin-BESS-TailRisk-Optimizer.git)
+cd Berlin-BESS-TailRisk-Optimizer
+Install dependencies:
+
+Bash
+pip install -r requirements.txt
+Run Unit Tests:
+
+Bash
+python3 -m unittest discover tests
+Run Main Application:
+
+Bash
+python3 app.py
+👤 Author
+Seyedmohammadreza (Max) Refaei
+
+Renewable Energy & Sustainability | Power Market Analytics | Python & BESS Optimization
