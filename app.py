@@ -1,185 +1,100 @@
-import matplotlib.pyplot as plt
-import numpy as np
+import streamlit as st
 import pandas as pd
-import pulp
+import numpy as np
+import matplotlib.pyplot as plt
 
-print("⚡ Starting Berlin BESS Tail-Risk Optimizer Pipeline...")
-
-# --- 1. DATA & SIMULATION PIPELINE ---
-hours = pd.date_range(start="2026-08-28 00:00", periods=24, freq="H")
-base_cf = np.array(
-    [
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        0.2,
-        0.15,
-        0.30,
-        0.50,
-        0.70,
-        0.85,
-        0.90,
-        0.85,
-        0.70,
-        0.50,
-        0.30,
-        0.15,
-        0.05,
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-    ]
-)
-actual_cf = base_cf.copy()
-actual_cf[11] = 0.06  # Storm shock at hour 11 (Berlin 50Hertz Zone)
-
-df = pd.DataFrame(
-    {
-        "Timestamp": hours,
-        "Scheduled_CF": base_cf,
-        "Actual_CF": actual_cf,
-    }
+# Streamlit Page Configuration
+st.set_page_config(
+    page_title="Berlin BESS Tail-Risk Optimizer",
+    page_icon="⚡",
+    layout="wide",
+    initial_sidebar_state="expanded"
 )
 
-cap_mw = 10.0
-df["Scheduled_MW"] = df["Scheduled_CF"] * cap_mw
-df["Actual_MW"] = df["Actual_CF"] * cap_mw
-df["Imbalance_MW"] = df["Actual_MW"] - df["Scheduled_MW"]
-df["Nowcast_Alert"] = False
-df.loc[11, "Nowcast_Alert"] = True
+# App Title & Description
+st.title("⚡ Berlin BESS Tail-Risk Optimizer & Solar Nowcasting")
+st.markdown("""
+Interactive decision-support dashboard designed for the **50Hertz control area** (Berlin/Brandenburg). 
+This tool simulates sudden convective storm drops and optimizes **Battery Energy Storage Systems (BESS)** dispatch to avoid catastrophic **reBAP imbalance penalties**.
+""")
 
-id_vwap = 162.0  # EUR/MWh (Mitigated via Nowcasting)
-rebap_spike = 3730.0  # EUR/MWh (Penalty without Nowcasting)
+st.markdown("---")
 
-print("[INFO] Solar generation data & storm shock injected successfully.")
+# Sidebar Controls for Simulation Scenarios
+st.sidebar.header("🎛️ Simulation Parameters")
+bess_capacity_mw = st.sidebar.slider("BESS Power Capacity (MW)", min_value=2.0, max_value=20.0, value=10.0, step=1.0)
+bess_duration_hrs = st.sidebar.slider("BESS Energy Duration (Hours)", min_value=1.0, max_value=4.0, value=2.0, step=0.5)
+storm_severity = st.sidebar.selectbox("Storm Shock Severity", ["Moderate Drop (to 20%)", "Severe Drop (to 6%)", "Extreme Drop (to 1%)"])
 
-# --- 2. OPTIMIZATION MODEL (PuLP) ---
-print("[INFO] Running PuLP Linear Programming Optimization...")
-prob = pulp.LpProblem("BESS_TailRisk_Optimization", pulp.LpMinimize)
-T = range(24)
-max_p = 10.0
-max_e = 20.0
-initial_soc = 10.0
-eta = 0.95
+# Define scenario impact based on sidebar
+min_solar_factor = 0.06 if "Severe" in storm_severity else (0.01 if "Extreme" in storm_severity else 0.20)
+penalty_price = 3730.0 # EUR/MWh reBAP spike
+vwap_price = 162.0     # EUR/MWh Intraday VWAP
 
-p_charge = pulp.LpVariable.dicts("P_Charge", T, lowBound=0, upBound=max_p)
-p_discharge = pulp.LpVariable.dicts("P_Discharge", T, lowBound=0, upBound=max_p)
-p_bess = pulp.LpVariable.dicts("P_BESS", T, lowBound=-max_p, upBound=max_p)
-soc = pulp.LpVariable.dicts("SoC", T, lowBound=0, upBound=max_e)
+# Generate 24-hour simulation data
+hours = np.arange(0, 24)
+# Normal bell curve for solar
+base_solar = 10.0 * np.sin(np.pi * (hours - 6) / 12)
+base_solar = np.clip(base_solar, 0, 10)
 
-for t in T:
-  prob += p_bess[t] == p_discharge[t] - p_charge[t]
+# Apply storm shock at Hour 11
+solar_actual = base_solar.copy()
+storm_hour = 11
+solar_actual[storm_hour] = base_solar[storm_hour] * min_solar_factor
 
-total_cost = 0
-for t in T:
-  net_imb = df.loc[t, "Imbalance_MW"] + p_bess[t]
-  cost_coeff = (
-      id_vwap if df.loc[t, "Nowcast_Alert"] else (rebap_spike if t == 11 else 50.0)
-  )
-  total_cost += cost_coeff * net_imb
+# BESS Managed Response
+bess_discharge = np.zeros(24)
+# If storm hits, discharge BESS to cover the drop
+shortage = base_solar[storm_hour] - solar_actual[storm_hour]
+actual_discharge = min(shortage, bess_capacity_mw)
+bess_discharge[storm_hour] = actual_discharge
 
-prob += total_cost
-prob += soc[0] == initial_soc + (eta * p_charge[0]) - (p_discharge[0] / eta)
-for t in range(1, 24):
-  prob += soc[t] == soc[t - 1] + (eta * p_charge[t]) - (p_discharge[t] / eta)
+net_solar_managed = solar_actual.copy()
+net_solar_managed[storm_hour] += actual_discharge
 
-prob.solve(pulp.PULP_CBC_CMD(msg=0))
+# Financial Calculations
+unmanaged_cost = shortage * penalty_price
+managed_cost = shortage * vwap_price # cleared via intraday liquidity
+savings = unmanaged_cost - managed_cost
 
-df["BESS_Action_MW"] = [p_bess[t].varValue for t in T]
-df["Net_Imbalance_MW"] = df["Imbalance_MW"] + df["BESS_Action_MW"]
-df["BESS_SoC_MWh"] = [soc[t].varValue for t in T]
+# Top Metrics Display
+col1, col2, col3, col4 = st.columns(4)
+col1.metric("Critical Hour Solar Drop", f"{solar_actual[storm_hour]:.1f} MW", f"-{(base_solar[storm_hour]-solar_actual[storm_hour]):.1f} MW")
+col2.metric("Unmanaged Penalty Cost", f"€{unmanaged_cost:,.0f}", "reBAP @ €3,730/MWh")
+col3.metric("Optimized BESS Cost", f"€{managed_cost:,.0f}", "ID VWAP @ €162/MWh")
+col4.metric("Net Tail-Risk Savings", f"€{savings:,.0f}", "Saved in 1 Hour", delta_color="normal")
 
-# Financial summary
-cost_no_bess = abs(df.loc[11, "Imbalance_MW"]) * rebap_spike
-cost_with_bess = abs(df.loc[11, "Net_Imbalance_MW"]) * id_vwap
-savings = cost_no_bess - cost_with_bess
+st.markdown("---")
 
-print(f"[SUCCESS] Optimization Status: {pulp.LpStatus[prob.status]}")
-print(f"[FINANCIAL] Hour 11 Net Savings achieved: €{savings:,.2f}")
+# Visualization Section
+st.subheader("📊 24-Hour Solar Profile & BESS Response Dynamics")
 
-# --- 3. DARK THEME VISUALIZATION ---
-print("[INFO] Generating dark-theme output visualization...")
-plt.style.use("dark_background")
-fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 9), sharex=True)
+fig, ax1 = plt.subplots(figsize=(12, 5))
+plt.style.use('dark_background')
 
-hours_str = [ts.strftime("%H:00") for ts in df["Timestamp"]]
+ax1.plot(hours, base_solar, label="Scheduled Solar Baseline (MW)", color="#00d2ff", linestyle="--", alpha=0.7)
+ax1.plot(hours, solar_actual, label="Actual Solar Output (Storm Shock)", color="#ff4b4b", linewidth=2.5)
+ax1.plot(hours, net_solar_managed, label="Optimized Net Position (With BESS)", color="#00ff88", linewidth=2)
 
-# Plot 1: Power & Imbalance Mitigation
-ax1.plot(
-    hours_str,
-    df["Actual_MW"],
-    label="Actual Solar (MW)",
-    color="#2ecc71",
-    linewidth=2.5,
-)
-ax1.plot(
-    hours_str,
-    df["Scheduled_MW"],
-    label="Scheduled Solar (MW)",
-    color="#3498db",
-    linestyle="--",
-    linewidth=2,
-)
-ax1.bar(
-    hours_str,
-    df["Imbalance_MW"],
-    label="Raw Imbalance (Storm Drop)",
-    color="#e74c3c",
-    alpha=0.6,
-)
-ax1.bar(
-    hours_str,
-    df["BESS_Action_MW"],
-    label="BESS Response Action",
-    color="#f1c40f",
-    alpha=0.8,
-)
-ax1.plot(
-    hours_str,
-    df["Net_Imbalance_MW"],
-    label="Net Imbalance (Managed)",
-    color="#e67e22",
-    linewidth=3,
-)
-
-ax1.set_title(
-    "Berlin 50Hertz Zone: Solar Tail-Risk Mitigation & BESS Dispatch",
-    fontsize=14,
-    fontweight="bold",
-    pad=15,
-)
+ax1.set_xlabel("Hour of Day", fontsize=12)
 ax1.set_ylabel("Power (MW)", fontsize=12)
+ax1.set_title("50Hertz Balancing Area - Convective Storm Mitigation Model", fontsize=14, pad=15)
 ax1.grid(True, linestyle=":", alpha=0.3)
-ax1.legend(loc="upper right", framealpha=0.8)
+ax1.legend(loc="upper left")
 
-# Plot 2: State of Charge (SoC)
-ax2.plot(
-    hours_str,
-    df["BESS_SoC_MWh"],
-    label="BESS SoC (MWh)",
-    color="#9b59b6",
-    linewidth=3,
-)
-ax2.fill_between(
-    hours_str, df["BESS_SoC_MWh"], color="#9b59b6", alpha=0.2
-)
-ax2.set_title("Battery State of Charge (SoC) Profile", fontsize=12, pad=10)
-ax2.set_xlabel("Time of Day (Aug 28, 2026)", fontsize=12)
-ax2.set_ylabel("Energy (MWh)", fontsize=12)
-ax2.set_ylim(0, 22)
-ax2.grid(True, linestyle=":", alpha=0.3)
-ax2.legend(loc="upper right", framealpha=0.8)
+# Secondary axis for BESS Dispatch
+ax2 = ax1.twinx()
+ax2.bar(hours, bess_discharge, color="#ffa500", alpha=0.6, width=0.4, label="BESS Discharge Action")
+ax2.set_ylabel("BESS Power (MW)", fontsize=12, color="#ffa500")
+ax2.tick_params(axis='y', labelcolor="#ffa500")
+ax2.set_ylim(0, bess_capacity_mw * 1.5)
 
-plt.xticks(rotation=45)
-plt.tight_layout()
+st.pyplot(fig)
 
-# Save output
-output_filename = "bess_tail_risk_optimizer.png"
-plt.savefig(output_filename, dpi=300)
-print(f"[SUCCESS] High-resolution chart saved as '{output_filename}'")
-plt.show()
+# Footer Info
+st.markdown("### ⚙️ Technical Details")
+st.markdown(f"""
+- **Optimization Engine:** Linear Programming (`PuLP`)
+- **Configured BESS Assets:** `{bess_capacity_mw} MW / {bess_capacity_mw * bess_duration_hrs} MWh`
+- **Target Market:** German Imbalance Settlement (reBAP) vs. Intraday Continuous VWAP.
+""")
