@@ -65,12 +65,9 @@ Berlin-BESS-TailRisk-Optimizer/
 ├── app.py                   # Main standalone execution script
 ├── requirements.txt         # Project dependencies
 └── README.md
-⚙️ Getting Started & Installation
-Clone the repository:
-
-Bash
-git clone [https://github.com/Mohammadrezarefaei/Berlin-BESS-TailRisk-Optimizer.git](https://github.com/Mohammadrezarefaei/Berlin-BESS-TailRisk-Optimizer.git)
-cd Berlin-BESS-TailRisk-Optimizer
+pip install -r requirements.txt
+python3 -m unittest discover tests
+python3 app.py
 Install dependencies:
 
 Bash
