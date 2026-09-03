@@ -14,7 +14,7 @@ Inspired by real-world market tail-risk events (such as sudden convective storm 
 
 ## 🌐 Live Web Application
 Explore the interactive simulation and real-time BESS optimization dashboard:
-👉 **[Launch Streamlit Dashboard](TBD_STREAMLIT_LINK_HERE)** *(Coming Soon)*
+👉 **[Launch Streamlit Dashboard](https://berlin-bess-tailrisk-optimizer-fupczjf5yppk8e7zjjfocf.streamlit.app/)**
 
 ---
 
